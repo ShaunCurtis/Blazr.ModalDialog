@@ -1,0 +1,80 @@
+﻿@inject WeatherForecastService DataService
+
+<div class="p-3">
+
+    <div class="mb-3 display-6 border-bottom">
+        Weather Forecast Editor
+    </div>
+
+    <EditForm Model=this.model OnSubmit=this.SaveAsync>
+
+        <DataAnnotationsValidator/>
+        <EditStateTracker LockNavigation EditStateChanged=this.OnEditStateChanged />
+
+        <div class="mb-3">
+            <label class="form-label">Date</label>
+            <InputDate class="form-control" @bind-Value=this.model.Date />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Temperature &deg;C</label>
+            <InputNumber class="form-control" @bind-Value=this.model.TemperatureC />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Summary</label>
+            <InputSelect class="form-select" @bind-Value=this.model.Summary>
+                @if (model.Summary is null)
+                {
+                    <option disbabled selected value="null"> -- Select a Summary -- </option>
+                }
+                @foreach (var summary in this.DataService.Summaries)
+                {
+                    <option value="@summary">@summary</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="mb-3 text-end">
+            <button disabled="@(!_isDirty)" type="submit" class="btn btn-primary" @onclick=SaveAsync>Save</button>
+            <button disabled="@_isDirty" type="button" class="btn btn-dark" @onclick=Close>Exit</button>
+        </div>
+
+    </EditForm>
+
+</div>
+
+<div class="bg-dark text-white m-4 p-2">
+    <pre>Date : @this.model.Date</pre>
+    <pre>Temperature &deg;C : @this.model.TemperatureC</pre>
+    <pre>Summary: @this.model.Summary</pre>
+    <pre>State: @(_isDirty ? "Dirty" : "Clean")</pre>
+</div>
+
+@code {
+    [Parameter] public Guid Uid { get; set; }
+    [CascadingParameter] private IModalDialog? Modal { get; set; }
+
+    private bool _isDirty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        model = await this.DataService.GetForecastAsync(this.Uid) ?? new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    }
+
+    private void OnEditStateChanged(bool isDirty)
+        => _isDirty = isDirty;
+
+    private async Task SaveAsync()
+    {
+        await this.DataService.SaveForecastAsync(model);
+        this.Modal?.Close(ModalResult.OK());
+    }
+
+    private void Close()
+    {
+        this.Modal?.Close(ModalResult.OK());
+    }
+
+    private WeatherForecast model = new();
+}

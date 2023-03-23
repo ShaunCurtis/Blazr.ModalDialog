@@ -1,0 +1,35 @@
+﻿@*
+    /// ============================================================
+    /// Author: Shaun Curtis, Cold Elm Coders
+    /// License: Use And Donate
+    /// If you use it, donate something to a charity somewhere
+    /// ============================================================
+*@
+
+@namespace Blazr.ModalDialog.Components
+@inherits ModalDialogBase
+@implements IModalDialog
+
+@if (this.Display)
+{
+    <CascadingValue Value="(IModalDialog)this">
+        <div class="base-modal-background" @onclick="OnBackClick">
+            <div class="base-modal-content" style="@this.Width" @onclick:stopPropagation="true">
+                <DynamicComponent Type=this.ModalContentType Parameters=this.Options?.ControlParameters />
+            </div>
+        </div>
+    </CascadingValue>
+}
+
+@code {
+    private VanillaModalOptions modalOptions => this.Options as VanillaModalOptions ?? new();
+
+    protected string Width
+        => string.IsNullOrWhiteSpace(modalOptions.ModalWidth) ? string.Empty : $"width:{modalOptions.ModalWidth}";
+
+    private void OnBackClick()
+    {
+        if (modalOptions.ExitOnBackgroundClick)
+            this.Close(ModalResult.Exit());
+    }
+}
