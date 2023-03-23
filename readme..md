@@ -218,8 +218,63 @@ public abstract class ModalDialogBase : ComponentBase, IModalDialog
 
 
 ```csharp
+@namespace Blazr.ModalDialog.Components
+@inherits ModalDialogBase
+@implements IModalDialog
+
+@if (this.Display)
+{
+    <CascadingValue Value="(IModalDialog)this">
+        <div class="base-modal-background" @onclick="OnBackClick">
+            <div class="base-modal-content" style="@this.Width" @onclick:stopPropagation="true">
+                <DynamicComponent Type=this.ModalContentType Parameters=this.Options?.ControlParameters />
+            </div>
+        </div>
+    </CascadingValue>
+}
+
+@code {
+    private VanillaModalOptions modalOptions => this.Options as VanillaModalOptions ?? new();
+
+    protected string Width
+        => string.IsNullOrWhiteSpace(modalOptions.ModalWidth) ? string.Empty : $"width:{modalOptions.ModalWidth}";
+
+    private void OnBackClick()
+    {
+        if (modalOptions.ExitOnBackgroundClick)
+            this.Close(ModalResult.Exit());
+    }
+}
+```
+
+*VanillaModalDialog.razor.css*
+
+```css
+div.base-modal-background {
+    display: block;
+    position: fixed;
+    z-index: 101; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+div.base-modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 10px;
+    border: 2px solid #888;
+    width: 90%;
+}
 ```
 
 
 
 
+## History
+
+1. 19th November, 2020: Initial version
