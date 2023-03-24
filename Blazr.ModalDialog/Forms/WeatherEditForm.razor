@@ -53,7 +53,7 @@
 
 @code {
     [Parameter] public Guid Uid { get; set; }
-    [CascadingParameter] private IModalDialog? Modal { get; set; }
+    [CascadingParameter] private IModalDialogContext? Modal { get; set; }
 
     private bool _isDirty;
 

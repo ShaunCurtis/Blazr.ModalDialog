@@ -42,7 +42,7 @@ else
 
 @code {
     private IEnumerable<WeatherForecast> forecasts = Enumerable.Empty<WeatherForecast>();
-    private IModalDialog? _modal;
+    private BsModalDialog? _modal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -56,7 +56,7 @@ else
             var options = new VanillaModalOptions();
             options.ControlParameters.Add("Uid", uid);
 
-            var result = await _modal.ShowAsync<WeatherEditForm>(options);
+            var result = await _modal.Context.ShowAsync<WeatherEditForm>(options);
         }
     }
 }

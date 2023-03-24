@@ -72,9 +72,7 @@ public interface IModalDialog
 public interface IModalOptions 
 {
     public Dictionary<string, object> ControlParameters { get; }
-
     public Dictionary<string, object> OptionsList { get; }
-
     public object Data { get; }
 }
 ```
@@ -92,15 +90,7 @@ public sealed class ModalResult
 
     public static ModalResult OK() => new ModalResult() { ResultType = ModalResultType.OK };
 
-    public static ModalResult Exit() => new ModalResult() { ResultType = ModalResultType.Exit };
-
-    public static ModalResult Cancel() => new ModalResult() { ResultType = ModalResultType.Cancel };
-
-    public static ModalResult OK(object data) => new ModalResult() { Data = data, ResultType = ModalResultType.OK };
-
-    public static ModalResult Exit(object data) => new ModalResult() { Data = data, ResultType = ModalResultType.Exit };
-
-    public static ModalResult Cancel(object data) => new ModalResult() { Data = data, ResultType = ModalResultType.Cancel };
+    //... lots of static constructors
 }
 ```
 
@@ -114,14 +104,60 @@ public enum ModalResultType { NoSet, OK, Cancel, Exit }
 
 `ModalDialogBase` provides most of the boilerplate code for Modal Dialog inmplementations.
 
-It consists of a set of methods to show, hide and reset the component content.
+It consists of a set of methods to show, hide and reset the component content, and captures the `Type` and `ModalOptions` provided in the `Show` methods.
 
-It captures the `Type` and `ModalOptions` provided in the `Show` methods
+`Show` uses `TaskCompletionSource` to construct a manually controlled Task.  It seta the internal properties with the data supplied, sets `Display` to true and provides the running Task from the  `TaskCompletionSource` to the caller.
+
+```csharp
+protected TaskCompletionSource<ModalResult> _ModalTask { get; set; } = new TaskCompletionSource<ModalResult>();
+
+private Task<ModalResult> ShowModalAsync(Type control, IModalOptions options)
+{
+    if (!(typeof(IComponent).IsAssignableFrom(control)))
+        throw new InvalidOperationException("Passed control must implement IComponent");
+
+    this.Options = options;
+    this._ModalTask = new TaskCompletionSource<ModalResult>();
+    this.ModalContentType = control;
+    this.Display = true;
+    this.InvokeAsync(StateHasChanged);
+    return this._ModalTask.Task;
+}
+```
+
+`Close` clears the content from the modal and then sets the `TaskCompletionSource` and the Task held by the original caller of `Show` to complete, releasing the calling method to complete.
+
+```csharp
+public async void Close(ModalResult result)
+{
+    this.Display = false;
+    this.ModalContentType = null;
+    await this.InvokeAsync(StateHasChanged);
+    _ = this._ModalTask.TrySetResult(result);
+}
+```
+
+`Switch` switches the content component and `Upload` provides a mechanism to reload the content component with a different set of options.
+
+```csharp
+private async Task<bool> SwitchModalAsync(Type control, IModalOptions options)
+{
+    if (!(typeof(IComponent).IsAssignableFrom(control)))
+        throw new InvalidOperationException("Passed control must implement IComponent");
+
+    this.ModalContentType = control;
+    this.Options = options;
+    await this.InvokeAsync(StateHasChanged);
+    return true;
+}
+```
+
+The full class:
 
 ```csharp
 public abstract class ModalDialogBase : ComponentBase, IModalDialog
 {
-    public IModalOptions Options { get; protected set; } = new ModalOptions();
+    public IModalOptions? Options { get; protected set; }
 
     public bool Display { get; protected set; }
 
@@ -131,84 +167,57 @@ public abstract class ModalDialogBase : ComponentBase, IModalDialog
 
     protected Type? ModalContentType = null;
 
-    public Task<ModalResult> ShowAsync<TModal>(ModalOptions options) where TModal : IComponent
-    {
-        this.ModalContentType = typeof(TModal);
-        this.Options = options ??= this.Options;
-        this._ModalTask = new TaskCompletionSource<ModalResult>();
-        this.Display = true;
-        InvokeAsync(StateHasChanged);
-        return this._ModalTask.Task;
-    }
+    public Task<ModalResult> ShowAsync<TModal>(IModalOptions options) where TModal : IComponent
+        => this.ShowModalAsync(typeof(TModal), options);
 
-    public Task<ModalResult> ShowAsync(Type control, ModalOptions options)
+    public Task<ModalResult> ShowAsync(Type control, IModalOptions options)
+        => this.ShowModalAsync(control,options);
+
+    private Task<ModalResult> ShowModalAsync(Type control, IModalOptions options)
     {
         if (!(typeof(IComponent).IsAssignableFrom(control)))
             throw new InvalidOperationException("Passed control must implement IComponent");
 
-        this.Options = options ??= this.Options;
+        this.Options = options;
         this._ModalTask = new TaskCompletionSource<ModalResult>();
         this.ModalContentType = control;
         this.Display = true;
-        InvokeAsync(StateHasChanged);
+        this.InvokeAsync(StateHasChanged);
         return this._ModalTask.Task;
     }
 
-    public async Task<bool> SwitchAsync<TModal>(ModalOptions options) where TModal : IComponent
-    {
-        this.ModalContentType = typeof(TModal);
-        this.Options = options ??= this.Options;
-        await InvokeAsync(StateHasChanged);
-        return true;
-    }
+    public Task<bool> SwitchAsync<TModal>(IModalOptions options) where TModal : IComponent
+        => this.SwitchModalAsync(typeof(TModal), options);
 
-    public async Task<bool> SwitchAsync(Type control, ModalOptions options)
+    public Task<bool> SwitchAsync(Type control, IModalOptions options)
+        => this.SwitchModalAsync(control, options);
+
+    private async Task<bool> SwitchModalAsync(Type control, IModalOptions options)
     {
         if (!(typeof(IComponent).IsAssignableFrom(control)))
             throw new InvalidOperationException("Passed control must implement IComponent");
 
         this.ModalContentType = control;
-        this.Options = options ??= this.Options;
-        await InvokeAsync(StateHasChanged);
+        this.Options = options;
+        await this.InvokeAsync(StateHasChanged);
         return true;
     }
 
-    /// <summary>
-    /// Method to update the state of the display based on UIOptions
-    /// </summary>
-    /// <param name="options"></param>
-    public void Update(ModalOptions? options = null)
+    public async Task Update(IModalOptions? options = null)
     {
-        this.Options = options ??= this.Options;
-        InvokeAsync(StateHasChanged);
+        this.Options = options ?? this.Options;
+        await this.InvokeAsync(StateHasChanged);
     }
 
-    /// <summary>
-    /// Method called by the dismiss button to close the dialog
-    /// sets the task to complete, show to false and renders the component (which hides it as show is false!)
-    /// </summary>
-    public async void Dismiss()
-    {
-        _ = this._ModalTask.TrySetResult(ModalResult.Cancel());
-        await Reset();
-    }
+    public void Dismiss()
+        => this.Close(ModalResult.Cancel());
 
-    /// <summary>
-    /// Method called by child components through the cascade value of this component
-    /// sets the task to complete, show to false and renders the component (which hides it as show is false!)
-    /// </summary>
-    /// <param name="result"></param>
     public async void Close(ModalResult result)
-    {
-        _ = this._ModalTask.TrySetResult(result);
-        await Reset();
-    }
-
-    private async Task Reset()
     {
         this.Display = false;
         this.ModalContentType = null;
-        await InvokeAsync(StateHasChanged);
+        await this.InvokeAsync(StateHasChanged);
+        _ = this._ModalTask.TrySetResult(result);
     }
 }
 ```
