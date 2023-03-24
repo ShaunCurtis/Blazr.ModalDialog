@@ -21,12 +21,11 @@
 }
 
 @code {
-    private VanillaModalOptions modalOptions => this.Context.Options as VanillaModalOptions ?? new();
 
-    protected string Width
+    protected string Width 
         => string.IsNullOrWhiteSpace(modalOptions.ModalWidth) ? string.Empty : $"width:{modalOptions.ModalWidth}";
-
-    public VanillaModalDialog() : base() { }
+    
+    private VanillaModalOptions modalOptions => this.Context.Options as VanillaModalOptions ?? new();
     
     private void OnBackClick()
     {

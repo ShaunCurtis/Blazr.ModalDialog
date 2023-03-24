@@ -49,10 +49,10 @@ public class ModalDialogContext : IModalDialogContext
             throw new InvalidOperationException("Passed control must implement IComponent");
 
         this.Options = options;
-        this._ModalTask = new TaskCompletionSource<ModalResult>();
         this.ModalContentType = control;
         this.Display = true;
         this.NotifyRenderRequired?.Invoke();
+        this._ModalTask = new TaskCompletionSource<ModalResult>();
         return this._ModalTask.Task;
     }
 

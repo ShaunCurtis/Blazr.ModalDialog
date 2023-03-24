@@ -9,8 +9,14 @@ public abstract class ModalDialogBase : ComponentBase
 {
     public readonly IModalDialogContext Context = new ModalDialogContext();
 
-    public ModalDialogBase()
-        => this.Context.NotifyRenderRequired = this.OnRenderRequested;
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        parameters.SetParameterProperties(this);
+        
+        this.Context.NotifyRenderRequired = this.OnRenderRequested;
+
+        return base.SetParametersAsync(ParameterView.Empty);
+    }
 
     private void OnRenderRequested()
         => StateHasChanged();

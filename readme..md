@@ -10,13 +10,14 @@ Coming
 
 ## The Implementation
 
-There are three base classes, one interface and one Enum:
+There are three classes, two interface and an Enum:
 
-1. `IModalDialog`
-2. `ModalDialogBase`
-3. `IModalOptions`
-4. `ModalResult`
-5. `ModalResultType`
+1. `IModalOptions`
+2. `IModalDialogContext`
+3. `ModalResult`
+4. `ModalResultType`
+5. `ModalDialogContext`
+6. `ModalDialogBase`
 
 The following code shows how to open a `WeatherEditForm` within a modal dialog on the `FetchData` page.  You'll see the full implementation later.  The method builds a `ModalOptions` object containing the Uid of the record to display.  It  calls `ShowAsync<WeatherForm>(options)`, defining the form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
 
@@ -28,7 +29,7 @@ private async Task EditAsync(Guid uid)
         var options = new ModalOptions();
         options.ControlParameters.Add("Uid", uid);
 
-        var result = await _modal.ShowAsync<WeatherEditForm>(options);
+        var result = await _modal.Context.ShowAsync<WeatherEditForm>(options);
 
         // Code here doesn't run until the dialog closes
     }
@@ -41,26 +42,6 @@ The form calls `Close(modal result)` which completes the `Task` and `EditAsync` 
 private void Close()
 {
     this.Modal?.Close(ModalResult.OK());
-}
-```
-
-### IModalDialog
-
-`IModalDialog` is the interface defining functiuonality all modal dialogs must imnplement.
-
-```csharp
-public interface IModalDialog
-{
-    public IModalOptions Options { get; }
-    public bool IsActive { get; }
-    public bool Display { get; }
-    public Task<ModalResult> ShowAsync<TModal>(IModalOptions options) where TModal : IComponent;
-    public Task<ModalResult> ShowAsync(Type control, IModalOptions options);
-    public Task<bool> SwitchAsync<TModal>(IModalOptions options) where TModal : IComponent;
-    public Task<bool> SwitchAsync(Type control, IModalOptions options);
-    public void Dismiss();
-    public void Close(ModalResult result);
-    public void Update(IModalOptions? options = null);
 }
 ```
 
@@ -100,13 +81,39 @@ And `ModalResultType`:
 public enum ModalResultType { NoSet, OK, Cancel, Exit }
 ```
 
-### ModalDialogBase
+### IModalDialogContext
 
-`ModalDialogBase` provides most of the boilerplate code for Modal Dialog inmplementations.
+`IModalDialogContext` is the interface defining the functionality for state and state management of the modal dialog.  The context is maintained in a separate class to the modal dialog component.  We can cascade the context without having to cascade the whole component.
+
+```csharp
+public interface IModalDialogContext
+{
+    public IModalOptions? Options { get; }
+    public bool Display { get; }
+    public bool IsActive { get; }
+    public Type? ModalContentType { get; }
+    public Action? NotifyRenderRequired { get; set; }
+
+    public Task<ModalResult> ShowAsync<TModal>(IModalOptions options) where TModal : IComponent;
+    public Task<ModalResult> ShowAsync(Type control, IModalOptions options);
+    public bool Switch<TModal>(IModalOptions options) where TModal : IComponent;
+    public bool Switch(Type control, IModalOptions options);
+    public void Update(IModalOptions? options = null);
+    public void Dismiss();
+    public void Close(ModalResult result);
+}
+```
+
+### ModalDialogContext
+
+`ModalDialogContext` provides most of the boilerplate code for Modal Dialog implementations.
 
 It consists of a set of methods to show, hide and reset the component content, and captures the `Type` and `ModalOptions` provided in the `Show` methods.
 
-`Show` uses `TaskCompletionSource` to construct a manually controlled Task.  It seta the internal properties with the data supplied, sets `Display` to true and provides the running Task from the  `TaskCompletionSource` to the caller.
+`Show`:
+1. Sets the state.
+2. Notifies the component to render: this will show the dialog framework and create the content component.
+3. Uses a `TaskCompletionSource` to construct a manually controlled Task and provides the Task (in the not completed state) to the caller to `await`.
 
 ```csharp
 protected TaskCompletionSource<ModalResult> _ModalTask { get; set; } = new TaskCompletionSource<ModalResult>();
@@ -117,27 +124,34 @@ private Task<ModalResult> ShowModalAsync(Type control, IModalOptions options)
         throw new InvalidOperationException("Passed control must implement IComponent");
 
     this.Options = options;
-    this._ModalTask = new TaskCompletionSource<ModalResult>();
     this.ModalContentType = control;
     this.Display = true;
-    this.InvokeAsync(StateHasChanged);
+    this.NotifyRenderRequired?.Invoke();
+    this._ModalTask = new TaskCompletionSource<ModalResult>();
     return this._ModalTask.Task;
 }
 ```
 
-`Close` clears the content from the modal and then sets the `TaskCompletionSource` and the Task held by the original caller of `Show` to complete, releasing the calling method to complete.
+`Close`:
+
+1. Clears the state.
+2. Notifies the component to render: this will hide the dialog framework and destroy the content component.
+3. Sets the `TaskCompletionSource` to complete.  This releases the caller of `Show` (if they awaited) to complete execution.
 
 ```csharp
-public async void Close(ModalResult result)
+private void CloseModal(ModalResult result)
 {
     this.Display = false;
     this.ModalContentType = null;
-    await this.InvokeAsync(StateHasChanged);
+    this.NotifyRenderRequired?.Invoke();
     _ = this._ModalTask.TrySetResult(result);
 }
 ```
 
-`Switch` switches the content component and `Upload` provides a mechanism to reload the content component with a different set of options.
+`Switch`:
+
+1. Sets the state.
+2. Notifies the component to render: this will show the dialog framework with the new content component.
 
 ```csharp
 private async Task<bool> SwitchModalAsync(Type control, IModalOptions options)
@@ -155,7 +169,7 @@ private async Task<bool> SwitchModalAsync(Type control, IModalOptions options)
 The full class:
 
 ```csharp
-public abstract class ModalDialogBase : ComponentBase, IModalDialog
+public class ModalDialogContext : IModalDialogContext
 {
     public IModalOptions? Options { get; protected set; }
 
@@ -163,15 +177,35 @@ public abstract class ModalDialogBase : ComponentBase, IModalDialog
 
     public bool IsActive => this.ModalContentType is not null;
 
-    protected TaskCompletionSource<ModalResult> _ModalTask { get; set; } = new TaskCompletionSource<ModalResult>();
+    public Action? NotifyRenderRequired { get; set; }
 
-    protected Type? ModalContentType = null;
+    private TaskCompletionSource<ModalResult> _ModalTask { get; set; } = new TaskCompletionSource<ModalResult>();
+
+    public Type? ModalContentType {get; private set;} = null;
 
     public Task<ModalResult> ShowAsync<TModal>(IModalOptions options) where TModal : IComponent
         => this.ShowModalAsync(typeof(TModal), options);
 
     public Task<ModalResult> ShowAsync(Type control, IModalOptions options)
-        => this.ShowModalAsync(control,options);
+        => this.ShowModalAsync(control, options);
+
+    public bool Switch<TModal>(IModalOptions options) where TModal : IComponent
+        => this.SwitchModal(typeof(TModal), options);
+
+    public bool Switch(Type control, IModalOptions options)
+        => this.SwitchModal(control, options);
+
+    public void Update(IModalOptions? options = null)
+    {
+        this.Options = options ?? this.Options;
+        this.NotifyRenderRequired?.Invoke();
+    }
+
+    public void Dismiss()
+        => this.CloseModal(ModalResult.Cancel());
+
+    public void Close(ModalResult result)
+        => this.CloseModal(result);
 
     private Task<ModalResult> ShowModalAsync(Type control, IModalOptions options)
     {
@@ -182,49 +216,61 @@ public abstract class ModalDialogBase : ComponentBase, IModalDialog
         this._ModalTask = new TaskCompletionSource<ModalResult>();
         this.ModalContentType = control;
         this.Display = true;
-        this.InvokeAsync(StateHasChanged);
+        this.NotifyRenderRequired?.Invoke();
         return this._ModalTask.Task;
     }
 
-    public Task<bool> SwitchAsync<TModal>(IModalOptions options) where TModal : IComponent
-        => this.SwitchModalAsync(typeof(TModal), options);
-
-    public Task<bool> SwitchAsync(Type control, IModalOptions options)
-        => this.SwitchModalAsync(control, options);
-
-    private async Task<bool> SwitchModalAsync(Type control, IModalOptions options)
+    private bool SwitchModal(Type control, IModalOptions options)
     {
         if (!(typeof(IComponent).IsAssignableFrom(control)))
             throw new InvalidOperationException("Passed control must implement IComponent");
 
         this.ModalContentType = control;
         this.Options = options;
-        await this.InvokeAsync(StateHasChanged);
+        this.NotifyRenderRequired?.Invoke();
         return true;
     }
 
-    public async Task Update(IModalOptions? options = null)
-    {
-        this.Options = options ?? this.Options;
-        await this.InvokeAsync(StateHasChanged);
-    }
-
-    public void Dismiss()
-        => this.Close(ModalResult.Cancel());
-
-    public async void Close(ModalResult result)
+    private void CloseModal(ModalResult result)
     {
         this.Display = false;
         this.ModalContentType = null;
-        await this.InvokeAsync(StateHasChanged);
+        this.NotifyRenderRequired?.Invoke();
         _ = this._ModalTask.TrySetResult(result);
     }
 }
 ```
 
+### ModalDialogBase
+
+`ModalDialogBase` implements the boilerplate plate code for modal dialog implementations.
+
+It sets the callback in `SetParametersAsync` rather that in `OnInitlized` to ensure it isn't overridden by inheriting classes.
+
+```csharp
+public abstract class ModalDialogBase : ComponentBase
+{
+    public readonly IModalDialogContext Context = new ModalDialogContext();
+
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        parameters.SetParameterProperties(this);
+        this.Context.NotifyRenderRequired = this.OnRenderRequested;
+        return base.SetParametersAsync(ParameterView.Empty);
+    }
+
+    private void OnRenderRequested()
+        => StateHasChanged();
+}
+```
 
 ### VanillaModalDialog
 
+`VanillaModalDialog` provides a basic modal dialog wrapper around the component.  It has:
+
+1. A clickable background.
+2. Configurable width.
+3. Uses `DynamicComponent` to render the requested component.
 
 ```csharp
 @namespace Blazr.ModalDialog.Components
