@@ -51,7 +51,7 @@ private void Close()
 
 ### IModalOptions
 
-`IModalOptions` defines three ways to pass data to the dialog.  A modal dialog implementation can use a generic `ModalOptions` or define a specific `IModalOptions`.
+`IModalOptions` defines three ways to pass data to the dialog.  A modal dialog implementation can use the generic `ModalOptions` or define a specific `IModalOptions`.
 
 ```csharp
 public interface IModalOptions 
@@ -126,7 +126,7 @@ public interface IModalDialogContext
 
 `ModalDialogContext` implements `IModalDialogContext`,  providing the boilerplate code for ModalDialog implementations.
 
-It consists of properties to maintain state and methods to show, hide and reset the component content.
+It consists of properties to maintain state and methods to show, hide, switch and reset the component content.
 
 `Show`:
 1. Ensures the passed type is a component i.e implements `IComponent`.
@@ -259,7 +259,7 @@ public class ModalDialogContext : IModalDialogContext
 
 `ModalDialogBase` implements the boilerplate code for modal dialog components.
 
-It creates an instance of `ModalDialogContext` and sets the callback in `SetParametersAsync`: this ensures inheriting classes don't override it.
+It creates an instance of `ModalDialogContext` and sets the callback in `SetParametersAsync`: this ensures inheriting classes can't inadvertently override it.
 
 ```csharp
 public abstract class ModalDialogBase : ComponentBase
@@ -280,7 +280,7 @@ public abstract class ModalDialogBase : ComponentBase
 
 ### VanillaModalDialog
 
-`VanillaModalDialog` provides a basic modal dialog wrapper around the component.  It has:
+`VanillaModalDialog` provides a basic Css styled modal dialog component wrapper.  It has:
 
 1. A clickable background.
 2. Configurable width.
@@ -345,7 +345,9 @@ div.base-modal-content {
 
 ### BsModelDialog
 
-A custom `IModalOptions`:
+`BsModalDialog` provides a Bootstrap styled modal dialog component wrapper.
+
+It has a custom `IModalOptions` where you can set the modal size.
 
 ```csharp
 public sealed class BsModalOptions: IModalOptions
@@ -564,7 +566,7 @@ And `FetchData`.
 
 This implementation demonstrates several techniques and practices in developing Blazor components.
 
-1. How to use `TaskCompletionSource` to manage the showing and hiding of the dialoig.
+1. How to use `TaskCompletionSource` to manage showing and hiding the dialog.
 1. Separation of component state into a context class, so you can cascade the state context and not the component.
 1. The example code demonstrates both Edit state tracking and Navigation locking.
 
