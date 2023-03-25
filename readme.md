@@ -10,6 +10,8 @@ The code repository is here: [Modal Dialog Repository](https://github.com/ShaunC
 
 ## The Implementation
 
+### Overview
+
 The implementation consists of two interfaces, four classes and an enum:
 
 1. `IModalOptions`
@@ -20,9 +22,9 @@ The implementation consists of two interfaces, four classes and an enum:
 1. `ModalDialogContext`
 1. `ModalDialogBase`
 
-### Overview
+The example code uses the standard Blazor template and shows how to open an edit form component from the WeatherForecast list in `FetchData`.
 
-The code below shows how to open a `WeatherEditForm` in a modal dialog on the `FetchData` page: you'll see the full implementation later.  The method builds an `IModalOptions` object containing the Uid of the record.  It  calls `ShowAsync<WeatherForm>(options)`, defining the component form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
+The code below demonstrates the basics: how to open a `WeatherEditForm` in a modal dialog.  The method builds an `IModalOptions` object containing the Uid of the record.  It  calls `ShowAsync<WeatherForm>(options)`, defining the component form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
 
 ```csharp
 private async Task EditAsync(Guid uid)
