@@ -13,7 +13,7 @@ public enum ModalResultType { NoSet, OK, Cancel, Exit }
 /// <summary>
 /// Class to encapsulate the data returned by a Modal Dialog
 /// </summary>
-public sealed class ModalResult
+public sealed record ModalResult
 {
     public ModalResultType ResultType { get; private set; } = ModalResultType.NoSet;
 

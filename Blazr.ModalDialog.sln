@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.ModalDialog", "Blazr.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DDBD0360-106A-48F3-BE3A-5AACF4F5F3A9}"
 	ProjectSection(SolutionItems) = preProject
-		readme..md = readme..md
+		readme.md = readme.md
 	EndProjectSection
 EndProject
 Global

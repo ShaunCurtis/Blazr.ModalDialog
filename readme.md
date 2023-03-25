@@ -1,16 +1,16 @@
 # A Simple Modal Dialog for Blazor
 
-A web based SPA [Single Page Application] needs modal dialogs if it wants to look like a real application.
+A web based SPA [Single Page Application] needs modal dialogs to provide the same user experience as a desktop application.
 
-This article demonstrates how to build a simple generic modal dialog container for Blazor Components.  There's a basic vanilla Css and Bootstrap version.
+This article demonstrates how to create a simple generic modal dialog container for Blazor Components and build vanilla and Bootstrap versions.
 
 ## Code Repository
 
-[Modal Dialog Repository](https://github.com/ShaunCurtis/Blazr.ModalDialog)
+The code repository is here: [Modal Dialog Repository](https://github.com/ShaunCurtis/Blazr.ModalDialog)
 
 ## The Implementation
 
-There are four classes, two interfaces and an Enum:
+The implementation consists of two interfaces, four classes and an enum:
 
 1. `IModalOptions`
 1. `IModalDialogContext`
@@ -20,7 +20,9 @@ There are four classes, two interfaces and an Enum:
 1. `ModalDialogContext`
 1. `ModalDialogBase`
 
-The following code shows how to open a `WeatherEditForm` within a modal dialog on the `FetchData` page.  You'll see the full implementation later.  The method builds a `IModalOptions` object containing the Uid of the record to display.  It  calls `ShowAsync<WeatherForm>(options)`, defining the form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
+### Overview
+
+The code below shows how to open a `WeatherEditForm` in a modal dialog on the `FetchData` page: you'll see the full implementation later.  The method builds an `IModalOptions` object containing the Uid of the record.  It  calls `ShowAsync<WeatherForm>(options)`, defining the component form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
 
 ```csharp
 private async Task EditAsync(Guid uid)
@@ -47,7 +49,7 @@ private void Close()
 
 ### IModalOptions
 
-`IModalOptions` defines three ways to pass data into the dialog.  Implementations are specific to the modal dialog implementation.
+`IModalOptions` defines three ways to pass data to the dialog.  A modal dialog implementation can use a generic `ModalOptions` or define a specific `IModalOptions`.
 
 ```csharp
 public interface IModalOptions 
@@ -66,9 +68,7 @@ A basic implementation of `IModalOptions`.
 public class ModalOptions: IModalOptions
 {
     public Dictionary<string, object> ControlParameters { get; } = new Dictionary<string, object>();
-
     public Dictionary<string, object> OptionsList { get; } = new Dictionary<string, object>();
-
     public object Data { get; set; } = new();
 }
 ```
@@ -76,22 +76,20 @@ public class ModalOptions: IModalOptions
 
 ### ModalResult
 
-`ModalResult` provides a structured method to return status and data back to the caller.
+`ModalResult` is a return record that provides status and data back to the caller.
 
 ```csharp
-public sealed class ModalResult
+public sealed record ModalResult
 {
     public ModalResultType ResultType { get; private set; } = ModalResultType.NoSet;
-
     public object? Data { get; set; } = null;
-
     public static ModalResult OK() => new ModalResult() { ResultType = ModalResultType.OK };
 
     //... lots of static constructors
 }
 ```
 
-And `ModalResultType`:
+And `ModalResultType`.
 
 ```csharp
 public enum ModalResultType { NoSet, OK, Cancel, Exit }
@@ -99,7 +97,7 @@ public enum ModalResultType { NoSet, OK, Cancel, Exit }
 
 ### IModalDialogContext
 
-`ModalDialogContext` encapsulates state and state management for a modal dialog component in a context class.  The context is cascaded not the component.
+`ModalDialogContext` encapsulates state and state management for a modal dialog component in a context class.
 
 `IModalDialogContext` defines the interface.
 
@@ -124,9 +122,9 @@ public interface IModalDialogContext
 
 ### ModalDialogContext
 
-`ModalDialogContext` implements `IModalDialogContext`,  providing the boilerplate code for Modal Dialog implementations.
+`ModalDialogContext` implements `IModalDialogContext`,  providing the boilerplate code for ModalDialog implementations.
 
-It consists of properties to maontain state and methods to show, hide and reset the component content.
+It consists of properties to maintain state and methods to show, hide and reset the component content.
 
 `Show`:
 1. Ensures the passed type is a component i.e implements `IComponent`.
@@ -191,15 +189,10 @@ The full class:
 public class ModalDialogContext : IModalDialogContext
 {
     public IModalOptions? Options { get; protected set; }
-
     public bool Display { get; protected set; }
-
     public bool IsActive => this.ModalContentType is not null;
-
     public Action? NotifyRenderRequired { get; set; }
-
     private TaskCompletionSource<ModalResult> _ModalTask { get; set; } = new TaskCompletionSource<ModalResult>();
-
     public Type? ModalContentType {get; private set;} = null;
 
     public Task<ModalResult> ShowAsync<TModal>(IModalOptions options) where TModal : IComponent
@@ -262,9 +255,9 @@ public class ModalDialogContext : IModalDialogContext
 
 ### ModalDialogBase
 
-`ModalDialogBase` implements the boilerplate plate code for modal dialog component.
+`ModalDialogBase` implements the boilerplate code for modal dialog components.
 
-It creates an instance of `ModalDialogContext` and sets the callback in `SetParametersAsync` rather that in `OnInitialized` to ensure it isn't overridden by inheriting classes.
+It creates an instance of `ModalDialogContext` and sets the callback in `SetParametersAsync`: this ensures inheriting classes don't override it.
 
 ```csharp
 public abstract class ModalDialogBase : ComponentBase
@@ -290,6 +283,8 @@ public abstract class ModalDialogBase : ComponentBase
 1. A clickable background.
 2. Configurable width.
 3. Uses `DynamicComponent` to render the requested component.
+
+*VanillaModalDialog.razor*
 
 ```csharp
 @namespace Blazr.ModalDialog.Components
@@ -348,17 +343,14 @@ div.base-modal-content {
 
 ### BsModelDialog
 
-The custom `IModalOptions`:
+A custom `IModalOptions`:
 
 ```csharp
 public sealed class BsModalOptions: IModalOptions
 {
     public string ModalSize { get; set; } = "modal-xl";
-
     public Dictionary<string, object> ControlParameters { get; } = new Dictionary<string, object>();
-
     public Dictionary<string, object> OptionsList { get; } = new Dictionary<string, object>();
-
     public object Data { get; set; } = new();
 }
 ```
@@ -386,7 +378,6 @@ public sealed class BsModalOptions: IModalOptions
 
 @code {
     private BsModalOptions modalOptions => this.Context.Options as BsModalOptions ?? new();
-        
     protected string Size => modalOptions.ModalSize;
 }
 ```
@@ -406,18 +397,22 @@ and *BsModalDialog.razor.css*:
 
 ## Demonstration
 
-The demonstration modifies the `FetchData` page, demonstrating a modal dialog editor for the weather forecasts.  You can view all the code in the repository.
+The demonstration uses the `FetchData` page, adding a modal dialog editor for the weather forecasts.  You can view all the code in the repository, including the updated `WeatherForecastService`.
 
-An edit form for a `WeatherForecast` record.
+### WeatherEditForm
 
-1. Capture the cascaded `IModalDialogContext`.
-1. As the form is designed to run in a modal dialog context, throw an expection if there's no cascaded `IModalDialogContext`.
-1. The form uses `EditStateTracker` which tracks the edir state and is detailed here [Blazr.EditStateTracker](https://github.com/ShaunCurtis/Blazr.EditStateTracker).
-1. The form interacts with the modal context in *Save* and *Close*.
+`WeatherEditForm` is the edit form for a `WeatherForecast` record.
 
+It:
 
-*WeatherEditForm*
+1. Captures the cascaded `IModalDialogContext`.
+1. Throws an expection if there's no cascaded `IModalDialogContext`: the form is designed to run in a modal dialog context.
+1. Uses `EditStateTracker`.  This tracks the edit state and is detailed here [Blazr.EditStateTracker](https://github.com/ShaunCurtis/Blazr.EditStateTracker).
+1. Interacts with the modal context in *Save* and *Close*.
+
 ```csharp
+// WeatherEditForm.razor
+
 @inject WeatherForecastService DataService
 
 <div class="p-3">
@@ -565,6 +560,11 @@ And `FetchData`.
 
 ## Wrap Up
 
+This implementation demonstrates several techniques and practices in developing Blazor components.
+
+1. How to use `TaskCompletionSource` to manage the showing and hiding of the dialoig.
+1. Separation of component state into a context class, so you can cascade the state context and not the component.
+1. The example code demonstrates both Edit state tracking and Navigation locking.
 
 
 ## History
