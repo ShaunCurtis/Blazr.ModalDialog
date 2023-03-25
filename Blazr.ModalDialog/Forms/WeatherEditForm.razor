@@ -55,13 +55,15 @@
     [Parameter] public Guid Uid { get; set; }
     [CascadingParameter] private IModalDialogContext? Modal { get; set; }
 
+    private WeatherForecast model = new();
     private bool _isDirty;
 
     protected override async Task OnInitializedAsync()
     {
+        ArgumentNullException.ThrowIfNull(Modal);
         model = await this.DataService.GetForecastAsync(this.Uid) ?? new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
     }
-
+    
     private void OnEditStateChanged(bool isDirty)
         => _isDirty = isDirty;
 
@@ -72,9 +74,5 @@
     }
 
     private void Close()
-    {
-        this.Modal?.Close(ModalResult.OK());
-    }
-
-    private WeatherForecast model = new();
+        =>  this.Modal?.Close(ModalResult.OK());
 }

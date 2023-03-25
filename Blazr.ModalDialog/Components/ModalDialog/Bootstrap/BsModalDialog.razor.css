@@ -1,3 +1,8 @@
 ﻿.modal-body {
     padding: 0;
 }
+
+.show-modal {
+    display: block;
+    background-color: rgb(0,0,0,0.6);
+}

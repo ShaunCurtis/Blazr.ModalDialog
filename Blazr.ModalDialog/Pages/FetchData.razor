@@ -53,7 +53,7 @@ else
     {
         if (_modal is not null)
         {
-            var options = new VanillaModalOptions();
+            var options = new BsModalOptions();
             options.ControlParameters.Add("Uid", uid);
 
             var result = await _modal.Context.ShowAsync<WeatherEditForm>(options);

@@ -1,37 +1,37 @@
 # A Simple Modal Dialog for Blazor
 
-A web based SPA [Single Page Application] that wants to look like a real application needs modal dialogs.
+A web based SPA [Single Page Application] needs modal dialogs if it wants to look like a real application.
 
-This article shows how to build a modal dialog container for Blazor Components.  There's a basic vanilla Css and Bootstrap version.
+This article demonstrates how to build a simple generic modal dialog container for Blazor Components.  There's a basic vanilla Css and Bootstrap version.
 
 ## Code Repository
 
-Coming
+[Modal Dialog Repository](https://github.com/ShaunCurtis/Blazr.ModalDialog)
 
 ## The Implementation
 
-There are three classes, two interface and an Enum:
+There are four classes, two interfaces and an Enum:
 
 1. `IModalOptions`
-2. `IModalDialogContext`
-3. `ModalResult`
-4. `ModalResultType`
-5. `ModalDialogContext`
-6. `ModalDialogBase`
+1. `IModalDialogContext`
+1. `ModalOptions`
+1. `ModalResult`
+1. `ModalResultType`
+1. `ModalDialogContext`
+1. `ModalDialogBase`
 
-The following code shows how to open a `WeatherEditForm` within a modal dialog on the `FetchData` page.  You'll see the full implementation later.  The method builds a `ModalOptions` object containing the Uid of the record to display.  It  calls `ShowAsync<WeatherForm>(options)`, defining the form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
+The following code shows how to open a `WeatherEditForm` within a modal dialog on the `FetchData` page.  You'll see the full implementation later.  The method builds a `IModalOptions` object containing the Uid of the record to display.  It  calls `ShowAsync<WeatherForm>(options)`, defining the form to display and the options for that form, and awaits the returned `Task`.  The `Task` doesn't complete until the modal closes.
 
 ```csharp
 private async Task EditAsync(Guid uid)
 {
     if (_modal is not null)
     {
-        var options = new ModalOptions();
+        var options = new BsModalOptions();
         options.ControlParameters.Add("Uid", uid);
 
         var result = await _modal.Context.ShowAsync<WeatherEditForm>(options);
-
-        // Code here doesn't run until the dialog closes
+        // Code to run after the Dialog closes 
     }
 }
 ```
@@ -47,7 +47,7 @@ private void Close()
 
 ### IModalOptions
 
-`IModalOptions` defines three ways if passing data into `TModel`.  Implementations are specific to the modal dialog impklementation.
+`IModalOptions` defines three ways to pass data into the dialog.  Implementations are specific to the modal dialog implementation.
 
 ```csharp
 public interface IModalOptions 
@@ -58,9 +58,25 @@ public interface IModalOptions
 }
 ```
 
+### ModalOptions
+
+A basic implementation of `IModalOptions`.
+
+```csharp
+public class ModalOptions: IModalOptions
+{
+    public Dictionary<string, object> ControlParameters { get; } = new Dictionary<string, object>();
+
+    public Dictionary<string, object> OptionsList { get; } = new Dictionary<string, object>();
+
+    public object Data { get; set; } = new();
+}
+```
+
+
 ### ModalResult
 
-`ModalResult` provides a structure way to return both status and data back to the caller.
+`ModalResult` provides a structured method to return status and data back to the caller.
 
 ```csharp
 public sealed class ModalResult
@@ -83,7 +99,9 @@ public enum ModalResultType { NoSet, OK, Cancel, Exit }
 
 ### IModalDialogContext
 
-`IModalDialogContext` is the interface defining the functionality for state and state management of the modal dialog.  The context is maintained in a separate class to the modal dialog component.  We can cascade the context without having to cascade the whole component.
+`ModalDialogContext` encapsulates state and state management for a modal dialog component in a context class.  The context is cascaded not the component.
+
+`IModalDialogContext` defines the interface.
 
 ```csharp
 public interface IModalDialogContext
@@ -106,14 +124,15 @@ public interface IModalDialogContext
 
 ### ModalDialogContext
 
-`ModalDialogContext` provides most of the boilerplate code for Modal Dialog implementations.
+`ModalDialogContext` implements `IModalDialogContext`,  providing the boilerplate code for Modal Dialog implementations.
 
-It consists of a set of methods to show, hide and reset the component content, and captures the `Type` and `ModalOptions` provided in the `Show` methods.
+It consists of properties to maontain state and methods to show, hide and reset the component content.
 
 `Show`:
-1. Sets the state.
-2. Notifies the component to render: this will show the dialog framework and create the content component.
-3. Uses a `TaskCompletionSource` to construct a manually controlled Task and provides the Task (in the not completed state) to the caller to `await`.
+1. Ensures the passed type is a component i.e implements `IComponent`.
+2. Sets the state.
+3. Invokes the callback to notify the component to render: this will show the dialog framework and create the content component.
+4. Uses a `TaskCompletionSource` to construct a manual active Task and passes the task back to the caller to `await`.
 
 ```csharp
 protected TaskCompletionSource<ModalResult> _ModalTask { get; set; } = new TaskCompletionSource<ModalResult>();
@@ -135,8 +154,8 @@ private Task<ModalResult> ShowModalAsync(Type control, IModalOptions options)
 `Close`:
 
 1. Clears the state.
-2. Notifies the component to render: this will hide the dialog framework and destroy the content component.
-3. Sets the `TaskCompletionSource` to complete.  This releases the caller of `Show` (if they awaited) to complete execution.
+2. Invokes the callback to notify the component to render: this will hide the dialog framework and destroy the content component.
+3. Sets the `TaskCompletionSource` to complete.  If the caller awaited `Show`, the call method will now run to completion.
 
 ```csharp
 private void CloseModal(ModalResult result)
@@ -151,7 +170,7 @@ private void CloseModal(ModalResult result)
 `Switch`:
 
 1. Sets the state.
-2. Notifies the component to render: this will show the dialog framework with the new content component.
+2. Invokes the callback to notify the component to render: this will show the dialog framework with the new content component.
 
 ```csharp
 private async Task<bool> SwitchModalAsync(Type control, IModalOptions options)
@@ -213,10 +232,10 @@ public class ModalDialogContext : IModalDialogContext
             throw new InvalidOperationException("Passed control must implement IComponent");
 
         this.Options = options;
-        this._ModalTask = new TaskCompletionSource<ModalResult>();
         this.ModalContentType = control;
         this.Display = true;
         this.NotifyRenderRequired?.Invoke();
+        this._ModalTask = new TaskCompletionSource<ModalResult>();
         return this._ModalTask.Task;
     }
 
@@ -243,9 +262,9 @@ public class ModalDialogContext : IModalDialogContext
 
 ### ModalDialogBase
 
-`ModalDialogBase` implements the boilerplate plate code for modal dialog implementations.
+`ModalDialogBase` implements the boilerplate plate code for modal dialog component.
 
-It sets the callback in `SetParametersAsync` rather that in `OnInitlized` to ensure it isn't overridden by inheriting classes.
+It creates an instance of `ModalDialogContext` and sets the callback in `SetParametersAsync` rather that in `OnInitialized` to ensure it isn't overridden by inheriting classes.
 
 ```csharp
 public abstract class ModalDialogBase : ComponentBase
@@ -327,9 +346,228 @@ div.base-modal-content {
 }
 ```
 
+### BsModelDialog
+
+The custom `IModalOptions`:
+
+```csharp
+public sealed class BsModalOptions: IModalOptions
+{
+    public string ModalSize { get; set; } = "modal-xl";
+
+    public Dictionary<string, object> ControlParameters { get; } = new Dictionary<string, object>();
+
+    public Dictionary<string, object> OptionsList { get; } = new Dictionary<string, object>();
+
+    public object Data { get; set; } = new();
+}
+```
+
+*BsModalDialog.razor*
+
+```csharp
+@namespace Blazr.ModalDialog.Components
+@inherits ModalDialogBase
+
+@if (this.Context.Display)
+{
+    <CascadingValue Value="(IModalDialogContext)this.Context">
+        <div class="modal show-modal" tabindex="-1">
+            <div class="modal-dialog @this.Size">
+                <div class="modal-content">
+                    <div class="modal-body">
+                        <DynamicComponent Type=this.Context.ModalContentType Parameters=this.Context.Options?.ControlParameters />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </CascadingValue>
+}
+
+@code {
+    private BsModalOptions modalOptions => this.Context.Options as BsModalOptions ?? new();
+        
+    protected string Size => modalOptions.ModalSize;
+}
+```
+
+and *BsModalDialog.razor.css*:
+
+```css
+.modal-body {
+    padding: 0;
+}
+
+.show-modal {
+    display: block;
+    background-color: rgb(0,0,0,0.6);
+}
+```
+
+## Demonstration
+
+The demonstration modifies the `FetchData` page, demonstrating a modal dialog editor for the weather forecasts.  You can view all the code in the repository.
+
+An edit form for a `WeatherForecast` record.
+
+1. Capture the cascaded `IModalDialogContext`.
+1. As the form is designed to run in a modal dialog context, throw an expection if there's no cascaded `IModalDialogContext`.
+1. The form uses `EditStateTracker` which tracks the edir state and is detailed here [Blazr.EditStateTracker](https://github.com/ShaunCurtis/Blazr.EditStateTracker).
+1. The form interacts with the modal context in *Save* and *Close*.
+
+
+*WeatherEditForm*
+```csharp
+@inject WeatherForecastService DataService
+
+<div class="p-3">
+
+    <div class="mb-3 display-6 border-bottom">
+        Weather Forecast Editor
+    </div>
+
+    <EditForm Model=this.model OnSubmit=this.SaveAsync>
+
+        <DataAnnotationsValidator/>
+        <EditStateTracker LockNavigation EditStateChanged=this.OnEditStateChanged />
+
+        <div class="mb-3">
+            <label class="form-label">Date</label>
+            <InputDate class="form-control" @bind-Value=this.model.Date />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Temperature &deg;C</label>
+            <InputNumber class="form-control" @bind-Value=this.model.TemperatureC />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Summary</label>
+            <InputSelect class="form-select" @bind-Value=this.model.Summary>
+                @if (model.Summary is null)
+                {
+                    <option disbabled selected value="null"> -- Select a Summary -- </option>
+                }
+                @foreach (var summary in this.DataService.Summaries)
+                {
+                    <option value="@summary">@summary</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="mb-3 text-end">
+            <button disabled="@(!_isDirty)" type="submit" class="btn btn-primary" @onclick=SaveAsync>Save</button>
+            <button disabled="@_isDirty" type="button" class="btn btn-dark" @onclick=Close>Exit</button>
+        </div>
+
+    </EditForm>
+
+</div>
+
+<div class="bg-dark text-white m-4 p-2">
+    <pre>Date : @this.model.Date</pre>
+    <pre>Temperature &deg;C : @this.model.TemperatureC</pre>
+    <pre>Summary: @this.model.Summary</pre>
+    <pre>State: @(_isDirty ? "Dirty" : "Clean")</pre>
+</div>
+
+@code {
+    [Parameter] public Guid Uid { get; set; }
+    [CascadingParameter] private IModalDialogContext? Modal { get; set; }
+
+    private WeatherForecast model = new();
+    private bool _isDirty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ArgumentNullException.ThrowIfNull(Modal);
+        model = await this.DataService.GetForecastAsync(this.Uid) ?? new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    }
+    
+    private void OnEditStateChanged(bool isDirty)
+        => _isDirty = isDirty;
+
+    private async Task SaveAsync()
+    {
+        await this.DataService.SaveForecastAsync(model);
+        this.Modal?.Close(ModalResult.OK());
+    }
+
+    private void Close()
+        =>  this.Modal?.Close(ModalResult.OK());
+}
+```
+
+And `FetchData`.
+
+1. Adds an Edit button to each row.
+2. Adds the `BsModalDialog` component to the page.
+3. Calls `ShowAsync` on the modal component to open the modal dialog with the Edit Form.
+
+```csharp
+@page "/fetchdata"
+@using Blazr.ModalDialog.Data
+@inject WeatherForecastService ForecastService
+
+<PageTitle>Weather forecast</PageTitle>
+
+<h1>Weather forecast</h1>
+
+<p>This component demonstrates fetching data from a service.</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Temp. (C)</th>
+            <th>Temp. (F)</th>
+            <th>Summary</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var forecast in forecasts)
+        {
+            <tr>
+                <td>@forecast.Date.ToShortDateString()</td>
+                <td>@forecast.TemperatureC</td>
+                <td>@forecast.TemperatureF</td>
+                <td>@forecast.Summary</td>
+                <td><button class="btn btn-sm btn-primary" @onclick="() => EditAsync(forecast.Uid)">Edit</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<BsModalDialog @ref=_modal />
+
+@code {
+    private IEnumerable<WeatherForecast> forecasts = Enumerable.Empty<WeatherForecast>();
+    private BsModalDialog? _modal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await ForecastService.GetForecastAsync();
+    }
+
+    private async Task EditAsync(Guid uid)
+    {
+        if (_modal is not null)
+        {
+            var options = new BsModalOptions();
+            options.ControlParameters.Add("Uid", uid);
+
+            var result = await _modal.Context.ShowAsync<WeatherEditForm>(options);
+        }
+    }
+}
+```
+
+## Wrap Up
 
 
 
 ## History
 
-1. 19th November, 2020: Initial version
+1. 19-Nov-2020: Initial version
+2. 25-Nov-2023: Revision 1
